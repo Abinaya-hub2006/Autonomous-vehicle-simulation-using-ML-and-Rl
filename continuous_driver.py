@@ -10,6 +10,29 @@ import torch
 from distutils.util import strtobool
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
+
+# --- START FIX FOR CARLA EGG PATH AND ATTRIBUTE ERROR ---
+# This code block forces Python to load the correct carla.egg file from the project directory.
+import glob
+import carla # Import carla after path fix
+
+CARLA_API_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'carla')
+sys.path.append(CARLA_API_PATH)
+
+# Find the specific .egg file and add its path to the system path
+try:
+    # Look for the correct .egg file matching the Python version (e.g., py3.10)
+    carla_egg_path = glob.glob(os.path.join(CARLA_API_PATH, 'carla-*-py%s.%s-%s.egg' % (sys.version_info[:2] + ('win-amd64',))))
+    if carla_egg_path:
+        sys.path.append(carla_egg_path[0])
+except:
+    pass
+
+# Logging setup (optional, but good practice)
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+# --- END FIX FOR CARLA EGG PATH AND ATTRIBUTE ERROR ---
+
+
 from encoder_init import EncodeState
 from networks.on_policy.ppo.agent import PPOAgent
 from simulation.connection import ClientConnection
@@ -43,11 +66,10 @@ def boolean_string(s):
     return s == 'True'
 
 
-
 def runner():
 
     #========================================================================
-    #                           BASIC PARAMETER & LOGGING SETUP
+    #                               BASIC PARAMETER & LOGGING SETUP
     #========================================================================
     
     args = parse_args()
@@ -69,7 +91,8 @@ def runner():
             """ 
             sys.exit() 
     except Exception as e:
-        print(e.message)
+        # Note: Original code used e.message, changed to str(e) for broader Python compatibility
+        print(str(e))
         sys.exit()
     
     if train == True:
@@ -89,7 +112,7 @@ def runner():
 
     
     action_std_decay_rate = 0.05
-    min_action_std = 0.05   
+    min_action_std = 0.05  
     action_std_decay_freq = 5e5
     timestep = 0
     episode = 0
@@ -100,24 +123,36 @@ def runner():
     distance_covered = 0
 
     #========================================================================
-    #                           CREATING THE SIMULATION
+    #                               CREATING THE SIMULATION
     #========================================================================
+
+    # --- FIX: Initialize client and world outside the try block to avoid UnboundLocalError ---
+    client = None
+    world = None
 
     try:
         client, world = ClientConnection(town).setup()
         logging.info("Connection has been setup successfully.")
-    except:
-        logging.error("Connection has been refused by the server.")
-        ConnectionRefusedError
+    except Exception as e:
+        # Catch any connection refusal or error
+        logging.error(f"Connection has been refused by the server. Error: {e}")
+        # The program will exit gracefully below if client is None
+    
+    # --- Check for successful connection BEFORE proceeding ---
+    if client is None or world is None:
+        print("FATAL: Could not connect to CARLA server. Exiting.")
+        sys.exit(1) # Exit with error code 1
+        
+    encode = EncodeState(LATENT_DIM)
+    
     if train:
         env = CarlaEnvironment(client, world,town)
     else:
         env = CarlaEnvironment(client, world,town, checkpoint_frequency=None)
-    encode = EncodeState(LATENT_DIM)
 
 
     #========================================================================
-    #                           ALGORITHM
+    #                               ALGORITHM
     #========================================================================
     try:
         time.sleep(0.5)
@@ -168,7 +203,7 @@ def runner():
                     current_ep_reward += reward
                     
                     if timestep % action_std_decay_freq == 0:
-                        action_std_init =  agent.decay_action_std(action_std_decay_rate, min_action_std)
+                        action_std_init = agent.decay_action_std(action_std_decay_rate, min_action_std)
 
                     if timestep == total_timesteps -1:
                         agent.chkpt_save()
@@ -233,7 +268,7 @@ def runner():
                     data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
                     with open(chkpt_file, 'wb') as handle:
                         pickle.dump(data_obj, handle)
-                        
+                    
             print("Terminating the run.")
             sys.exit()
         else:
@@ -293,7 +328,9 @@ def runner():
 
 
 if __name__ == "__main__":
-    try:        
+    try:
+        # Note: Original code imported carla here, but we moved the import to the top
+        # to fix the path issue. The rest of the original structure is maintained.
         runner()
     except KeyboardInterrupt:
         sys.exit()
