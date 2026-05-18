@@ -133,22 +133,3 @@ The folloing diagram depicts the VAE+PPO training pipeline. Note: all the variab
 | checkpints/                   | Folder containing serialized parameters of our agent saved while training                                             |
 | carla/                        | Folder containing CARL egg file, that is used in order to make connection with the server                             |
 | autoencoder/                  | Folder containing the code for our Variational Autoencoder (VAE)                                                      |
-
-
-## To view the training progress/plots in the Tensorboard:
-
-```
-tensorboard --logdir runs/
-```
-
-## Authors
-
-**Idrees Razak** - [GitHub](https://github.com/idreesshaikh), [LinkedIn](https://www.linkedin.com/in/idreesrazak/)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
-
-## Acknowledgments
-
-I thank, **Dr. Toka László**, for his exceptional leadership and unwavering support during this work.
